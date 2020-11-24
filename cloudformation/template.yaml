@@ -1,0 +1,102 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  NotificationEmail:
+    Description: Email address notifications will be sent to (leave empty to not create subscription to SNS topic)
+    Type: String
+
+  Tag1Key:
+    Description: Tag key to require on all resources (required)
+    Type: String
+    AllowedPattern: .+
+
+  Tag2Key:
+    Description: Tag key to require on all resources (optional)
+    Type: String
+
+  Tag3Key:
+    Description: Tag key to require on all resources (optional)
+    Type: String
+
+Conditions: 
+  CreateTopicSubscription: !Not [!Equals [ !Ref NotificationEmail, "" ] ]
+
+Resources:
+  ConfigRuleForRequiredTags: 
+    Type: AWS::Config::ConfigRule
+    Properties: 
+      InputParameters:
+        tag1Key: !Ref Tag1Key
+        tag2Key: !Ref Tag2Key
+        tag3Key: !Ref Tag3Key
+      Scope: 
+        ComplianceResourceTypes: 
+          - "AWS::EC2::Volume"
+          - "AWS::EC2::Instance"
+          - "AWS::EC2::SecurityGroup"
+          - "AWS::RDS::DBInstance"
+          - "AWS::RDS::DBSecurityGroup"
+          - "AWS::RDS::DBSnapshot"
+          - "AWS::Redshift::Cluster"
+          - "AWS::S3::Bucket"
+
+      Source: 
+        Owner: AWS
+        SourceIdentifier: "REQUIRED_TAGS"
+
+  NotificationTopic:
+    Type: AWS::SNS::Topic
+    Condition: CreateTopicSubscription
+    Properties: 
+      Subscription: 
+        - Protocol: email
+          Endpoint: !Ref NotificationEmail
+      TopicName: required-tags-notification-topic
+
+  EventRule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Alert on missing required tags
+      EventPattern:
+        source: 
+          - "aws.config"
+        detail-type: 
+          - "Config Rules Compliance Change"
+        detail: 
+          messageType: 
+            - ComplianceChangeNotification
+          configRuleName: 
+            - required-tags
+          newEvaluationResult:
+            complianceType:
+              - NON_COMPLIANT
+      Name: required-tags-rule
+      State: ENABLED
+      Targets: 
+        - 
+          Arn:
+            Ref: "NotificationTopic"
+          Id: "NotificationTopic"
+          InputTransformer:
+            InputPathsMap:
+              account: "$.account"
+              resourceType: "$.detail.newEvaluationResult.evaluationResultIdentifier.evaluationResultQualifier.resourceType"
+              resourceId: "$.detail.resourceId"
+            InputTemplate: '"A resource in AWS account <account> is missing one or more required tags."
+              "Resource Type: <resourceType>"
+              "Resource Id: <resourceId>"'
+
+  EventTopicPolicy:
+    Type: 'AWS::SNS::TopicPolicy'
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: 'sns:Publish'
+            Resource: '*'
+      Topics:
+        -
+          Ref: NotificationTopic
+        
