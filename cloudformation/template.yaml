@@ -25,6 +25,7 @@ Resources:
   ConfigRuleForRequiredTags: 
     Type: AWS::Config::ConfigRule
     Properties: 
+      ConfigRuleName: nu-required-tags
       InputParameters:
         tag1Key: !Ref Tag1Key
         tag2Key: !Ref Tag2Key
@@ -66,7 +67,7 @@ Resources:
           messageType: 
             - ComplianceChangeNotification
           configRuleName: 
-            - required-tags
+            - nu-required-tags
           newEvaluationResult:
             complianceType:
               - NON_COMPLIANT
