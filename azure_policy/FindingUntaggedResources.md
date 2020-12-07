@@ -1,6 +1,4 @@
 ## Identifying and Reporting Untagged Resources in Azure using Policy in Azure Portal
-=========
-
 [Microsoft Azure Policy](https://azure.microsoft.com/en-us/services/azure-policy) has built-in policies that can be leveraged to report on untagged resources (and resource groups).  
 
 Note:
